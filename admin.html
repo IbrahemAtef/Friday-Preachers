@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة جدول الخطباء</title>
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#1e6b3a" />
+    <meta name="description" content="إدارة جدول خطباء الجمعة" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icon-512.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Sortable.js for draggable preachers -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        :root {
+            --primary: #064e3b; 
+            --secondary: #065f46;
+            --accent: #10b981;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --border: #f1f5f9;
+            --error: #ef4444;
+            --radius: 20px;
+            --shadow-sm: 0 4px 6px -1px rgba(0,0,0,0.05);
+            --shadow-md: 0 10px 25px -5px rgba(0,0,0,0.08);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100dvh;
+        }
+
+        /* ───────── HEADER ───────── */
+        .header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 20px 16px 16px;
+            text-align: center;
+        }
+        .header h1 { font-size: 1.8rem; font-weight: 700; }
+        .header p  { font-size: 1.05rem; opacity: 0.85; margin-top: 6px; }
+
+        /* ───────── MAIN LAYOUT ───────── */
+        .page-body { padding: 12px 12px 100px; display: flex; flex-direction: column; gap: 14px; }
+
+        /* ───────── SCHEDULE PANEL ───────── */
+        .schedule-panel {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+        .panel-header h3 {
+            font-size: 1.1rem;
+            color: #fff;
+            font-weight: 700;
+            margin: 0;
+        }
+        .btn-new-friday {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 700;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .btn-new-friday:hover { 
+            background: rgba(255, 255, 255, 0.25); 
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        .btn-new-friday:active { transform: scale(0.95); }
+
+        /* Horizontal scroll on mobile */
+        .schedule-scroll {
+            display: flex;
+            gap: 10px;
+            padding: 14px 16px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .schedule-scroll::-webkit-scrollbar { display: none; }
+
+        /* Individual schedule card - NEW MODERN DESIGN */
+        .sched-card {
+            flex-shrink: 0;
+            width: 100px;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 0;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-sm);
+        }
+        .sched-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: var(--accent); }
+        .sched-card:active { transform: scale(0.96); }
+
+        .sched-card .card-month {
+            display: block;
+            background: #f8fafc;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 800;
+            padding: 8px 4px;
+            text-transform: uppercase;
+            border-bottom: 1px dashed var(--border);
+            transition: 0.3s;
+        }
+        .sched-card .card-day {
+            display: block;
+            font-size: 2.4rem;
+            font-weight: 900;
+            color: #1e293b;
+            line-height: 1;
+            padding: 12px 4px 8px;
+            transition: 0.3s;
+        }
+        .sched-card .card-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 0 6px 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: 0.3s;
+        }
+        .sched-card .card-del {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.08);
+            border: none;
+            color: #94a3b8;
+            font-size: 0.6rem;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            transition: 0.2s;
+            line-height: 1;
+        }
+        .sched-card .card-del:hover { background: #fee2e2; color: var(--error); }
+
+        .sched-card.active {
+            border-color: var(--primary);
+            box-shadow: 0 15px 30px -10px rgba(30,107,58,0.3);
+            background: #fff;
+        }
+        .sched-card.active .card-month { background: var(--primary); color: #fff; border-bottom-color: transparent; }
+        .sched-card.active .card-day   { color: var(--primary); transform: scale(1.1); }
+        .sched-card.active .card-label { color: var(--primary); font-weight: 800; }
+        .sched-card.active .card-del   { background: rgba(30,107,58,0.15); color: var(--primary); }
+        .sched-card.active .card-del:hover { background: #fee2e2; color: var(--error); }
+
+        .sched-badge {
+            display: block;
+            font-size: 0.55rem;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 2px 6px;
+            border-bottom: 1px solid #fde68a;
+            font-weight: 700;
+        }
+
+        /* ───────── NO SELECTION STATE ───────── */
+        .no-selection {
+            background: var(--card);
+            border-radius: var(--radius);
+            border: 2px dashed var(--border);
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+        .no-selection .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .no-selection p { font-size: 0.95rem; }
+
+        /* ───────── CONFIG GRID ───────── */
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .config-grid .input-group.full { grid-column: 1 / -1; }
+
+        .input-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 1.05rem;
+            transition: all 0.3s;
+            background: #fdfdfd;
+            color: var(--text);
+        }
+        .input-group input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 4px rgba(6, 78, 59, 0.06); background: #fff; }
+
+        .time-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .time-input-wrapper input[type="time"] {
+            cursor: pointer;
+            font-weight: 700;
+            color: var(--primary);
+            appearance: none;
+            -webkit-appearance: none;
+        }
+        /* Custom calendar/clock icon styling for chrome/safari */
+        .time-input-wrapper input[type="time"]::-webkit-calendar-picker-indicator {
+            background: transparent;
+            bottom: 0;
+            color: transparent;
+            cursor: pointer;
+            height: auto;
+            left: 0;
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: auto;
+        }
+
+        /* ───────── TABLE CARD ───────── */
+        .table-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .table-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: #fff;
+            border-bottom: 2px solid var(--bg);
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .btn-shift {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 14px;
+            background: #fff;
+            color: var(--primary);
+            border: 2px solid #e2ece5;
+            font-size: 0.95rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .btn-shift:hover { 
+            border-color: var(--primary); 
+            background: #f0fdf4; 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(30, 107, 58, 0.1);
+        }
+        .btn-shift:active { transform: scale(0.96); }
+
+        /* Row cards - More like a modern table */
+        /* Updated Column labels row */
+        .row-labels {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 100px;
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: #64748b;
+            background: #f8fafc;
+            border-bottom: 2px solid #e2e8f0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Updated Row Card */
+        .row-card {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 100px;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.2s;
+        }
+        .row-card:nth-child(even) { background: #fafbfc; }
+        .row-card:hover { background: #f8fafc; }
+
+        .preacher-col-cell {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding-right: 8px;
+        }
+
+        .drag-handle {
+            cursor: grab;
+            color: #cbd5e1;
+            padding: 8px 4px;
+            display: flex;
+            align-items: center;
+            transition: 0.2s;
+        }
+        .drag-handle:hover { color: var(--text-muted); }
+        .drag-handle:active { cursor: grabbing; }
+
+        /* Drop target placeholder — shows full dragged row content, faded */
+        .row-ghost {
+            background: rgba(30, 107, 58, 0.08) !important;
+            border-top: 2px dashed #1e6b3a !important;
+            border-bottom: 2px dashed #1e6b3a !important;
+            opacity: 0.5 !important;
+        }
+
+        /* ── The clone that follows the cursor while dragging ── */
+        /* Make it look like a compact preacher-name pill */
+        .row-dragging {
+            display: flex !important;
+            align-items: center !important;
+            width: auto !important;
+            background: var(--primary) !important;
+            border-radius: 20px !important;
+            border: none !important;
+            box-shadow: 0 6px 20px rgba(30,107,58,0.4) !important;
+            overflow: hidden !important;
+            padding: 0 !important;
+            opacity: 0.97 !important;
+        }
+        /* Hide mosque name and actions in the flying clone */
+        .row-dragging .mosque-val { display: none !important; }
+        .row-dragging .actions-cell { display: none !important; }
+        .row-dragging .drag-handle { display: none !important; }
+        /* Style the preacher cell inside the flying clone */
+        .row-dragging .preacher-col-cell {
+            padding: 10px 20px !important;
+            width: auto !important;
+        }
+        .row-dragging .preacher-val {
+            color: #fff !important;
+            background: transparent !important;
+            font-weight: 700 !important;
+            font-size: 1rem !important;
+            padding: 0 !important;
+            border: none !important;
+            pointer-events: none !important;
+            width: auto !important;
+        }
+
+        .actions-cell {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            padding: 0 8px;
+        }
+
+        .btn-row-action {
+            width: 32px;
+            height: 32px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .btn-apply {
+            background: #f0fdf4;
+            color: #16a34a;
+            visibility: hidden; /* Hidden until edited */
+        }
+        .btn-apply.dirty { visibility: visible; }
+        .btn-apply:hover { background: #dcfce7; transform: scale(1.1); }
+
+        .btn-delete-row {
+            background: transparent;
+            color: #ef4444; 
+        }
+        .btn-delete-row:hover { background: #fee2e2; }
+
+        .row-input {
+            width: 100%;
+            border: none;
+            padding: 14px 12px;
+            font-family: inherit;
+            font-size: 1.05rem;
+            background: transparent;
+            color: var(--text);
+            transition: all 0.2s;
+        }
+        .row-input:focus { 
+            background: #fff; 
+            outline: none; 
+            box-shadow: inset 0 0 0 2px var(--primary);
+            z-index: 1;
+        }
+
+        .btn-header-add {
+            background: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-header-add:hover { background: var(--secondary); transform: translateY(-2px); }
+
+        /* ───────── STICKY BOTTOM ACTION BAR ───────── */
+        .action-bar {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            left: 0;
+            background: var(--card);
+            border-top: 1px solid var(--border);
+            padding: 10px 16px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+            box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+        }
+        .action-bar button {
+            flex: 1;
+            padding: 16px 12px;
+            border: none;
+            border-radius: 16px;
+            font-family: inherit;
+            font-size: 1.1rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .btn-add { 
+            background: #fff; 
+            color: #0f172a; 
+            border: 2px solid #e2e8f0 !important;
+        }
+        .btn-add:hover { 
+            background: #f8fafc; 
+            border-color: #cbd5e1 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        
+        .btn-save { 
+            background: linear-gradient(135deg, var(--primary), var(--secondary)); 
+            color: #fff; 
+            box-shadow: 0 8px 20px -6px rgba(30, 107, 58, 0.4);
+        }
+        .btn-save:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px -8px rgba(30, 107, 58, 0.5);
+            filter: brightness(1.1);
+        }
+
+        .btn-back { 
+            background: #fff; 
+            color: #64748b; 
+            border: 2px solid #e2e8f0 !important; 
+            flex: 0 0 auto !important; 
+            width: 56px !important;
+            padding: 0 !important;
+            font-size: 1.4rem !important;
+        }
+        .btn-back:hover { background: #f1f5f9; color: #1e293b; transform: translateY(-2px); }
+
+        .action-bar button:active { transform: scale(0.95); }
+
+        /* ───────── TOAST ───────── */
+        .toast {
+            position: fixed;
+            bottom: 82px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: none;
+            z-index: 3000;
+            white-space: nowrap;
+        }
+
+        /* ───────── MODAL ───────── */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 4000;
+            padding: 20px;
+        }
+        .modal-content {
+            background: #fff;
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            width: 100%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        .modal-content h3 { font-size: 1.1rem; margin-bottom: 10px; }
+        .modal-content p  { font-size: 0.9rem; color: var(--text-muted); }
+        .modal-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+        .btn-yes { background: var(--error); color: #fff; border: none; border-radius: 10px; padding: 11px 24px; font-family: inherit; font-weight: 700; cursor: pointer; }
+        .btn-no  { background: #e2e8f0; color: var(--text); border: none; border-radius: 10px; padding: 11px 24px; font-family: inherit; font-weight: 700; cursor: pointer; }
+
+        /* ─── TABLET (640px+): wider cards, still horizontal strip ─── */
+        @media (min-width: 640px) {
+            .page-body { padding: 16px 16px 100px; gap: 16px; }
+            .sched-card { width: 100px; }
+            .config-grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        /* ─── DESKTOP (900px+): sidebar layout ─── */
+        @media (min-width: 900px) {
+            .header { padding: 28px 40px; }
+            .header h1 { font-size: 1.8rem; }
+
+            .page-body {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 24px 24px 40px;
+                display: grid;
+                grid-template-columns: 280px 1fr;
+                grid-template-rows: auto 1fr;
+                gap: 24px;
+                align-items: start;
+            }
+
+            /* Sidebar: sticky left column */
+            .schedule-panel {
+                grid-row: 1 / 3;
+                grid-column: 1;
+                position: sticky;
+                top: 20px;
+                max-height: calc(100vh - 60px);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            .schedule-scroll {
+                /* Switch from horizontal to vertical 2-col grid */
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                padding: 14px;
+                overflow-y: auto;
+                overflow-x: hidden;
+                flex: 1;
+            }
+            .sched-card {
+                width: 100%;     /* fill grid cell */
+                flex-shrink: unset;
+            }
+
+            /* Editor area */
+            .editor-col {
+                grid-column: 2;
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            /* Config fields: 3 columns */
+            .config-grid {
+                grid-template-columns: 1fr 1fr 1fr;
+            }
+            .config-grid .input-group.full { grid-column: auto; }
+
+            /* Action bar: beautiful inline button group on desktop */
+            .action-bar {
+                position: static;
+                background: var(--card);
+                border: 1px solid var(--border);
+                box-shadow: var(--shadow-sm);
+                border-radius: var(--radius);
+                padding: 16px 20px;
+                justify-content: flex-end;
+                gap: 12px;
+            }
+            .action-bar button {
+                flex: 0 0 auto;
+                padding: 11px 28px;
+                font-size: 0.95rem;
+                border-radius: 10px;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .btn-save {
+                background: var(--primary);
+                box-shadow: 0 4px 12px rgba(30,107,58,0.3);
+                min-width: 140px;
+                justify-content: center;
+            }
+            .btn-save:hover { background: var(--secondary); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(30,107,58,0.35); }
+            .btn-add {
+                background: #f1f5f9;
+                color: var(--text);
+                border: 1.5px solid var(--border) !important;
+                min-width: 130px;
+                justify-content: center;
+            }
+            .btn-add:hover { background: var(--bg); border-color: var(--primary) !important; color: var(--primary); }
+            .btn-back {
+                background: transparent;
+                color: var(--text-muted);
+                border: 1.5px solid var(--border) !important;
+                padding: 11px 20px;
+            }
+            .btn-back:hover { background: #f1f5f9; color: var(--text); }
+            .toast { bottom: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="
+    display:flex; position:fixed; inset:0; z-index:9999;
+    background:rgba(255,255,255,0.85); backdrop-filter:blur(4px);
+    flex-direction:column; align-items:center; justify-content:center; gap:14px;
+">
+    <div style="width:44px;height:44px;border:4px solid #e2e8f0;border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+    <p style="font-size:1rem;color:var(--text-muted);font-weight:600;">جارٍ تحميل البيانات…</p>
+</div>
+<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+
+<div class="header" style="position:relative;">
+    <a href="index.html" class="btn-home" title="الرئيسية">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </a>
+    <style>
+        .btn-home {
+            position: absolute; 
+            top: 20px; 
+            left: 20px;
+            width: 42px; 
+            height: 42px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 100;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .btn-home svg {
+            width: 18px;
+            height: 18px;
+            transition: transform 0.3s ease;
+        }
+        .btn-home:hover {
+            background: rgba(255, 255, 255, 0.22);
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        .btn-home:hover svg {
+            transform: scale(1.1);
+        }
+        .btn-home:active {
+            transform: translateY(0) scale(0.95);
+        }
+    </style>
+    <h1>🕌 إدارة جدول الخطباء</h1>
+    <p>قم بإضافة وتعديل جداول يوم الجمعة بكل سهولة</p>
+</div>
+
+<div class="page-body">
+
+    <!-- ── Schedule Panel / Sidebar ── -->
+    <div class="schedule-panel">
+        <div class="panel-header">
+            <h3>📅 المواعيد المضافة</h3>
+            <button class="btn-new-friday" onclick="createNewFriday()">+ جمعة جديدة</button>
+        </div>
+        <div class="schedule-scroll" id="fridayList"></div>
+    </div>
+
+    <!-- ── Editor Column ── -->
+    <div class="editor-col">
+
+        <div class="no-selection" id="noSelectionMsg">
+            <div class="icon">⚠️</div>
+            <p>اختر موعداً من القائمة للتعديل عليه أو أضف موعداً جديداً</p>
+        </div>
+
+        <div id="editorContent" style="display:none; flex-direction:column; gap:14px;">
+
+            <!-- Config -->
+            <div class="table-card" style="padding:16px;">
+                <div class="config-grid">
+                    <div class="input-group">
+                        <label>📅 تاريخ الجمعة</label>
+                        <input type="date" id="editDateISO">
+                    </div>
+                    <div class="input-group">
+                        <label>🕒 ساعة الأذان</label>
+                        <div class="time-input-wrapper">
+                            <input type="time" id="editTime">
+                        </div>
+                    </div>
+                    <div class="input-group full">
+                        <label>📝 التسمية المعروضة (تلقائية)</label>
+                        <input type="text" id="editDateLabel" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rows Table -->
+            <div class="table-card">
+                <div class="table-card-header">
+                    <span>قائمة المساجد والخطباء</span>
+                    <button class="btn-header-add" onclick="addRow()">➕ إضافة سطر</button>
+                </div>
+                <div class="row-labels">
+                    <span style="padding-right:10px;">المسجد</span>
+                    <span style="padding-right:10px;">الخطيب</span>
+                    <span style="text-align:center;">إجراءات</span>
+                </div>
+                <!-- Container for Sortable rows -->
+                <div id="editTableBody"></div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- Action bar removed as per requirement -->
+
+<div id="toast" class="toast"></div>
+
+<div id="deleteModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 id="modalTitle">هل أنت متأكد؟</h3>
+        <p id="modalMsg">سيتم حذف هذا العنصر نهائياً.</p>
+        <div class="modal-buttons">
+            <button class="btn-yes" id="modalConfirmBtn">نعم، حذف</button>
+            <button class="btn-no" onclick="closeModal()">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="firebase-config.js"></script>
+<script type="module">
+    import { initializeApp }                        from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+
+    const firebaseConfig = window.firebaseConfig;
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    const DB_PATH = 'fridaySchedules';
+
+    // ─── Default data ───────────────────────
+    const defaultData = [
+        ["الرحمة", "محمد الأسطل"], ["أبي ذر الغفاري", "أبو بلال حرب"], ["الحاج موسى أبو موسى", "جبر أبو عكر"],
+        ["الحبيب", "عبدالرحمن عسقول"], ["عقبة", "إسلام النبريص"], ["المغاربة", "محمد كامل أبو مصطفى"],
+        ["حمزة", "خالد صليح"], ["الخير (الطيبي والسلوت)", "محمود بربخ"], ["حسن البنا", "ماجد أبو موسي"],
+        ["علي بن أبي طالب", "محمد عاشور"], ["أبي بكر الصديق", "محمد عبدالله كلاب"], ["الهدى", "أحمد الفرا"],
+        ["مصلى منتزة حي الامل", "ياسر الرياشي"], ["التقوى", "أحمد نبيل كلاب"], ["الخلفاء", "بلال نافع ابو دقة"],
+        ["البراء (غرب الأحياء)", "عمار قديح"], ["مصلى مخيم الشافعي", "براء العلبان"], ["مصلى مخيم حياة", "أحمد أبو مصطفي"],
+        ["صلاح شحادة", "محمد سمير العامودي"], ["الشافعي", "حامد شعبان أبو علوان"], ["عباد الرحمن", "ضياء أبو طعيمة"],
+        ["خالد بن الوليد", "أحمد يوسف"], ["الألباني", "عبدالله وليد النجار"], ["الفاروق", "عادل عوض"],
+        ["الترتوري", "sلمان عمران"], ["البراق", "محمد الترتوري"], ["عمر الحاووز", "أحمد عرام"],
+        ["المجاهدين", "نبيل أبو عنزة"], ["بلال", "جهاد عواد"], ["الفرقان", "أحمد فسيفس"],
+        ["فلسطين", "عبدالرحمن أبو رزق"], ["الإحسان (النمساوي)", "عبدالله أبو حمد"], ["الأبرار", "ماجد أبو موسي"],
+        ["التوحيد", "إسلام الفقعاوي"]
+    ];
+
+    let schedules   = [];
+    let selectedId  = null;
+    let currentData = [];
+    let sortableInstance = null;
+    let saveTimeout = null;
+
+    // ─── Show/hide loading overlay ───────────
+    function setLoading(on) {
+        const overlay = document.getElementById('loadingOverlay');
+        if(overlay) overlay.style.display = on ? 'flex' : 'none';
+    }
+
+    // ─── Save to Firebase ────────────────────
+    async function saveToFirebase() {
+        await set(ref(db, DB_PATH), schedules);
+        showToast('✅ تم الحفظ تلقائياً');
+    }
+
+    function autoSave() {
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(async () => {
+            await saveToFirebase();
+        }, 1000);
+    }
+
+    // ─── Ensure default schedule exists ──────
+    function ensureDefault(list) {
+        if (!list.find(s => s.id === 'default')) {
+            list.push({
+                id: 'default', dateISO: "2026-02-27",
+                dateLabel: "الجدول الافتراضي (دائم)",
+                time: "11:56", data: defaultData, isDefault: true
+            });
+        }
+        return list;
+    }
+
+    function formatDateISO(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function sanitizeSchedules(list) {
+        let modified = false;
+        const options = { day: 'numeric', month: 'long', year: 'numeric' };
+        list.forEach(s => {
+            if (!s.isDefault && s.dateISO && s.dateLabel) {
+                const [y, m, d] = s.dateISO.split('-').map(Number);
+                const dateObj = new Date(y, m - 1, d);
+                const expectedLabel = dateObj.toLocaleDateString('ar-EG', options) + 'م';
+                if (s.dateLabel !== expectedLabel) {
+                    const nextDayObj = new Date(y, m - 1, d + 1);
+                    const expectedLabelNextDay = nextDayObj.toLocaleDateString('ar-EG', options) + 'م';
+                    if (s.dateLabel === expectedLabelNextDay) {
+                        s.dateISO = formatDateISO(nextDayObj);
+                        modified = true;
+                    } else {
+                        s.dateLabel = expectedLabel;
+                        modified = true;
+                    }
+                }
+            }
+        });
+        if (modified) saveToFirebase();
+        return list;
+    }
+
+    // ─── Bootstrap ───────────────────────────
+    async function init() {
+        setLoading(true);
+
+        try {
+            // Use onValue for real-time updates from the start
+            // It will trigger immediately if data is in cache, then again when network updates
+            onValue(ref(db, DB_PATH), (snapshot) => {
+                setLoading(false);
+
+                if (!snapshot.exists()) {
+                    schedules = ensureDefault([]);
+                    saveToFirebase();
+                } else {
+                    let data = snapshot.val();
+                    let list = Array.isArray(data) ? data : Object.values(data);
+                    schedules = sanitizeSchedules(list);
+                }
+
+                renderSidebar();
+                if (selectedId) {
+                    const s = schedules.find(x => String(x.id) === String(selectedId));
+                    if (s) {
+                        currentData = JSON.parse(JSON.stringify(s.data));
+                        renderTable();
+                    }
+                }
+            }, (error) => {
+                console.error(error);
+                setLoading(false);
+                showToast('❌ فشل في جلب البيانات من السيرفر');
+            });
+        } catch (err) {
+            console.error(err);
+            setLoading(false);
+        }
+    }
+
+    // ─── Sidebar render ───────────────────────
+    function renderSidebar() {
+        const container = document.getElementById('fridayList');
+        if(!container) return;
+        container.innerHTML = '';
+        schedules.sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+
+        schedules.forEach(s => {
+            const isActive = String(selectedId) === String(s.id);
+            const [y, m, d] = s.dateISO.split('-').map(Number);
+            const dateObj  = new Date(y, m - 1, d);
+            const monthStr = dateObj.toLocaleDateString('ar-EG', { month: 'short' });
+
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = `sched-card ${isActive ? 'active' : ''}`;
+            card.innerHTML = `
+                ${s.isDefault ? `<span class="sched-badge">دائم</span>` : ''}
+                <span class="card-month">${monthStr} ${y}</span>
+                <span class="card-day">${d}</span>
+                <span class="card-label">${s.dateLabel.replace(/\d{4}/, '').replace('م','').trim()}</span>
+                ${s.isDefault ? '' : `<button class="card-del" title="حذف" onclick="window._deleteFriday(event,'${s.id}')">✕</button>`}
+            `;
+            card.onclick = (e) => { if (!e.target.classList.contains('card-del')) selectFriday(s.id); };
+            container.appendChild(card);
+        });
+    }
+
+    // ─── Select a Friday ─────────────────────
+    function selectFriday(id) {
+        selectedId = id;
+        const s = schedules.find(x => String(x.id) === String(id));
+        if (!s) return;
+        currentData = JSON.parse(JSON.stringify(s.data));
+
+        const noSel = document.getElementById('noSelectionMsg');
+        const editor = document.getElementById('editorContent');
+        if(noSel) noSel.style.display = 'none';
+        if(editor) editor.style.display = 'flex';
+
+        const isoInput = document.getElementById('editDateISO');
+        const labelInput = document.getElementById('editDateLabel');
+        const timeInput = document.getElementById('editTime');
+
+        if(isoInput) isoInput.value = s.dateISO;
+        if(labelInput) labelInput.value = s.dateLabel;
+        if(timeInput) timeInput.value = s.time;
+
+        if(isoInput) {
+            isoInput.onchange = (e) => {
+                const val = e.target.value;
+                if (val) {
+                    const [y, m, d] = val.split('-').map(Number);
+                    const options = { day: 'numeric', month: 'long', year: 'numeric' };
+                    const label = new Date(y, m-1, d).toLocaleDateString('ar-EG', options) + 'م';
+                    if(labelInput) labelInput.value = label;
+                    const idx = schedules.findIndex(x => String(x.id) === String(selectedId));
+                    if (idx !== -1) {
+                        schedules[idx].dateISO = val;
+                        schedules[idx].dateLabel = label;
+                        saveToFirebase();
+                    }
+                }
+            };
+        }
+
+        if(timeInput) {
+            timeInput.oninput = () => {
+                const idx = schedules.findIndex(x => String(x.id) === String(selectedId));
+                if (idx !== -1) {
+                    schedules[idx].time = timeInput.value;
+                    autoSave();
+                }
+            };
+        }
+
+        renderTable();
+        renderSidebar();
+        requestAnimationFrame(() => {
+            document.querySelector('.sched-card.active')?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        });
+    }
+
+    // ─── Render Table ────────────────────────
+    function renderTable() {
+        const tbody = document.getElementById('editTableBody');
+        if(!tbody) return;
+        tbody.innerHTML = '';
+        currentData.forEach((item, i) => {
+            const row = document.createElement('div');
+            row.className = 'row-card';
+            row.dataset.index = i;
+            row.innerHTML = `
+                <input type="text" class="row-input mosque-val" placeholder="اسم المسجد" value="${item[0]}" oninput="window._markDirty(${i})">
+                <div class="preacher-col-cell">
+                    <div class="drag-handle" title="اسحب للتغيير">⠿</div>
+                    <input type="text" class="row-input preacher-val" placeholder="اسم الخطيب" value="${item[1]}" oninput="window._markDirty(${i})">
+                </div>
+                <div class="actions-cell">
+                    <button class="btn-row-action btn-apply" id="apply-${i}" onclick="window._applyRow(${i})" title="حفظ التعديلات">✅</button>
+                    <button class="btn-row-action btn-delete-row" onclick="window._deleteRow(${i})" title="حذف السطر">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                </div>
+            `;
+            tbody.appendChild(row);
+        });
+        initSortable();
+    }
+
+    function initSortable() {
+        const tbody = document.getElementById('editTableBody');
+        if(!tbody) return;
+        if (sortableInstance) sortableInstance.destroy();
+
+        // ── Custom drag ghost: intercept native dragstart (capture phase)
+        // This runs BEFORE SortableJS, so setDragImage wins.
+        tbody.addEventListener('dragstart', function onDragStart(e) {
+            const row = e.target.closest('.row-card');
+            if (!row) return;
+            const preaValue = row.querySelector('.preacher-val')?.value || '';
+
+            // Build a small pill element off-screen so browser can snapshot it
+            const pill = document.createElement('div');
+            pill.textContent = preaValue;
+            pill.style.cssText = [
+                'position:fixed',
+                'top:-300px',
+                'left:0',
+                'padding:10px 20px',
+                'background:#1e6b3a',
+                'color:#fff',
+                'border-radius:24px',
+                'font-size:1.05rem',
+                'font-family:Tajawal,sans-serif',
+                'font-weight:700',
+                'white-space:nowrap',
+                'direction:rtl',
+                'box-shadow:0 4px 16px rgba(30,107,58,0.4)',
+                'pointer-events:none',
+            ].join(';');
+            document.body.appendChild(pill);
+
+            // Force layout so offsetWidth is real before setDragImage
+            const w = pill.offsetWidth;
+            const h = pill.offsetHeight;
+            e.dataTransfer.setDragImage(pill, w / 2, h / 2);
+
+            // Remove after the browser has snapshoted it
+            requestAnimationFrame(() => pill.remove());
+        }, { capture: true });
+
+        sortableInstance = new Sortable(tbody, {
+            handle: '.drag-handle',
+            animation: 200,
+            ghostClass: 'row-ghost',
+            onEnd: async (evt) => {
+                const oldIndex = evt.oldIndex;
+                const newIndex = evt.newIndex;
+                if (oldIndex === newIndex) return;
+
+                // ── 1-to-1 Swap Logic ──
+                // Swap only the preacher names between the two rows
+                const temp = currentData[oldIndex][1];
+                currentData[oldIndex][1] = currentData[newIndex][1];
+                currentData[newIndex][1] = temp;
+
+                const idx = schedules.findIndex(x => String(x.id) === String(selectedId));
+                if (idx !== -1) {
+                    schedules[idx].data = JSON.parse(JSON.stringify(currentData));
+                    await saveToFirebase();
+                    renderTable();
+                }
+            }
+        });
+    }
+
+    window._markDirty = (i) => {
+        const btn = document.getElementById(`apply-${i}`);
+        if(btn) btn.classList.add('dirty');
+    };
+
+    window._applyRow = async (i) => {
+        const row = document.querySelectorAll('.row-card')[i];
+        if(!row) return;
+        const m = row.querySelector('.mosque-val').value;
+        const p = row.querySelector('.preacher-val').value;
+        currentData[i] = [m, p];
+        const idx = schedules.findIndex(x => String(x.id) === String(selectedId));
+        if (idx !== -1) {
+            schedules[idx].data = JSON.parse(JSON.stringify(currentData));
+            await saveToFirebase();
+            const btn = document.getElementById(`apply-${i}`);
+            if(btn) btn.classList.remove('dirty');
+        }
+    };
+
+    window._deleteRow = (i) => {
+        openModal('حذف سطر', 'هل تريد حذف هذا السطر؟', async () => {
+            currentData.splice(i, 1);
+            const idx = schedules.findIndex(x => String(x.id) === String(selectedId));
+            if (idx !== -1) {
+                schedules[idx].data = JSON.parse(JSON.stringify(currentData));
+                await saveToFirebase();
+                renderTable();
+            }
+        });
+    };
+
+    window.addRow = async () => {
+        if (!selectedId) return;
+        currentData.push(["", ""]);
+        const idx = schedules.findIndex(x => String(x.id) === String(selectedId));
+        if (idx !== -1) {
+            schedules[idx].data = JSON.parse(JSON.stringify(currentData));
+            await saveToFirebase();
+            renderTable();
+        }
+    };
+
+    async function createNewFriday() {
+        const id = Date.now();
+        let nextDate = new Date();
+        let lastData = [["", ""]];
+        if (schedules.length > 0) {
+            const sorted = [...schedules].sort((a,b) => a.dateISO.localeCompare(b.dateISO));
+            lastData = JSON.parse(JSON.stringify(sorted[sorted.length-1].data));
+            const [y,m,d] = sorted[sorted.length-1].dateISO.split('-').map(Number);
+            nextDate = new Date(y, m-1, d);
+            nextDate.setDate(nextDate.getDate() + 7);
+        } else {
+            while (nextDate.getDay() !== 5) nextDate.setDate(nextDate.getDate()+1);
+        }
+        const isoStr   = formatDateISO(nextDate);
+        const options  = { day:'numeric', month:'long', year:'numeric' };
+        const labelStr = nextDate.toLocaleDateString('ar-EG', options) + 'م';
+        const dynamic = schedules.filter(s => !s.isDefault).sort((a,b) => a.dateISO.localeCompare(b.dateISO));
+        if (dynamic.length >= 8) schedules = schedules.filter(s => s.id !== dynamic[0].id);
+        schedules.push({ id, dateISO: isoStr, dateLabel: labelStr, time: "11:56", data: lastData });
+        await saveToFirebase();
+        selectFriday(id);
+    }
+
+    async function deleteFriday(e, id) {
+        e.stopPropagation();
+        const sched = schedules.find(x => String(x.id) === String(id));
+        if (sched?.isDefault) return;
+        openModal('حذف موعد', 'هل أنت متأكد من حذف هذا الموعد بالكامل؟', async () => {
+            schedules = schedules.filter(x => String(x.id) !== String(id));
+            if (String(selectedId) === String(id)) {
+                selectedId = null;
+                const editor = document.getElementById('editorContent');
+                const noSel = document.getElementById('noSelectionMsg');
+                if(editor) editor.style.display = 'none';
+                if(noSel) noSel.style.display = 'block';
+            }
+            await saveToFirebase();
+            renderSidebar();
+        });
+    }
+
+    function openModal(title, msg, onConfirm) {
+        const t = document.getElementById('modalTitle');
+        const m = document.getElementById('modalMsg');
+        const overlay = document.getElementById('deleteModal');
+        const btn = document.getElementById('modalConfirmBtn');
+        if(t) t.textContent = title;
+        if(m) m.textContent = msg;
+        if(overlay) overlay.style.display = 'flex';
+        if(btn) btn.onclick = () => { onConfirm(); closeModal(); };
+    }
+    function closeModal() { 
+        const overlay = document.getElementById('deleteModal');
+        if(overlay) overlay.style.display = 'none'; 
+    }
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        if(!t) return;
+        t.textContent = msg;
+        t.style.display = 'block';
+        setTimeout(() => t.style.display = 'none', 3000);
+    }
+
+    window._deleteFriday = deleteFriday;
+    window.closeModal    = closeModal;
+    window.createNewFriday = createNewFriday;
+    window.onload = init;
+</script>
+
+</body>
+</html>
